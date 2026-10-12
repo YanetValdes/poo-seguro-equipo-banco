@@ -28,6 +28,7 @@ from model.transaccion import Transaccion
 from model.detalle_transaccion import DetalleTransaccion
 from model.saldo_insuficiente_exception import SaldoInsuficienteException
 from model.cuenta_bloqueada_exception import CuentaBloqueadaException
+from model.cliente_con_mora_exception import ClienteConMoraException
 
 
 def separador(titulo: str):
@@ -46,7 +47,7 @@ def main():
     separador("1. Creación de Entidades Principales (Cliente, Ejecutivo, Cajero)")
 
     cliente1 = Cliente(
-        rut="18.765.432-1",
+        rut="18.765.432-7",
         nombre="Matías",
         apellido="Tapia",
         telefono="+56987654321",
@@ -72,6 +73,15 @@ def main():
         bono_responsabilidad_caja=75000.0
     )
     print(f"[*] {cajero}")
+
+    # Evidencia: setter de RUT detecta un dígito verificador incorrecto.
+    separador("Validación de dato: RUT chileno")
+    try:
+        cliente1.rut = "18.765.432-1"  # Dígito incorrecto, el correcto es 7.
+        print("[ERROR] Un RUT inválido fue aceptado.")
+    except ValueError as error:
+        print(f"[CAPTURA EXITOSA] ValueError por RUT inválido: {error}")
+        print(f"[OK] El RUT anterior se conserva: {cliente1.rut}")
 
     # -------------------------------------------------------------------------
     # 2. CREACIÓN DE SUBTIPOS DE CUENTA (HERENCIA Y SUPER().__INIT__)
@@ -164,6 +174,23 @@ def main():
     cuenta_ahorro.desbloquear()
     print(f"\n[INFO] Cuenta de Ahorro desbloqueada nuevamente (bloqueada={cuenta_ahorro.bloqueada}).")
 
+    # Regla exigida por la ficha: cliente con mora vigente no puede abrir cuenta.
+    separador("Regla del negocio: prohibición de apertura con mora vigente")
+    cliente1.mora_vigente = True
+    try:
+        CuentaVista(numero_cuenta="CV-RECHAZADA", titular=cliente1, saldo_inicial=0,
+                    costo_fijo_giro=300.0, costo_mantencion_mensual=1000.0)
+        print("[ERROR] Se permitió abrir una cuenta con mora vigente.")
+    except ClienteConMoraException as error:
+        print(f"[CAPTURA EXITOSA] ClienteConMoraException: {error}")
+    finally:
+        cliente1.mora_vigente = False
+        print("[OK] Estado de mora restablecido para continuar la demostración.")
+
+    # Evidencia de agregación: la cuenta referencia un objeto Cliente ya creado.
+    separador("Agregación Cliente-Cuenta")
+    print(f"[OK] Cuenta y cliente comparten la misma referencia: {cuenta_ahorro.titular is cliente1}")
+
     # -------------------------------------------------------------------------
     # 5. GESTIÓN DE CRÉDITO Y CUOTAS (CREDITO, CUOTACREDITO Y EJECUTIVO)
     # -------------------------------------------------------------------------
@@ -221,7 +248,8 @@ def main():
     print("[OK] Todas las clases fueron instanciadas e integradas correctamente.")
     print("[OK] Herencia con super().__init__() aplicada.")
     print("[OK] Polimorfismo demostrado con 3 resultados diferentes para el mismo método.")
-    print("[OK] SaldoInsuficienteException y CuentaBloqueadaException provocadas y capturadas.")
+    print("[OK] SaldoInsuficienteException, ClienteConMoraException y CuentaBloqueadaException capturadas.")
+    print("[OK] RUT inválido rechazado y agregación Cliente-Cuenta demostrada.")
     print("[OK] Transacción con líneas de detalle procesada exitosamente.")
     print("\n>>> EJECUCIÓN DEL SISTEMA FINALIZADA CON ÉXITO <<<\n")
 

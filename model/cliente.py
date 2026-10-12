@@ -15,6 +15,7 @@ class Cliente:
         self.apellido = apellido
         self.telefono = telefono
         self.email = email
+        self.__mora_vigente = False
 
     @property
     def rut(self) -> str:
@@ -23,10 +24,30 @@ class Cliente:
 
     @rut.setter
     def rut(self, valor: str):
-        """Valida que el RUT no esté vacío y tenga una longitud mínima válida."""
-        if not isinstance(valor, str) or len(valor.strip()) < 8:
-            raise ValueError("El RUT debe ser una cadena válida de al menos 8 caracteres.")
-        self.__rut = valor.strip()
+        """Valida formato y dígito verificador del RUT chileno (módulo 11)."""
+        if not isinstance(valor, str):
+            raise ValueError("El RUT debe ser texto.")
+        limpio = valor.strip().replace(".", "").replace("-", "").upper()
+        if len(limpio) < 8 or len(limpio) > 9 or not limpio[:-1].isdigit() or limpio[-1] not in "0123456789K":
+            raise ValueError("Formato de RUT inválido.")
+        numero, dv = limpio[:-1], limpio[-1]
+        suma = sum(int(digito) * (2 + i % 6) for i, digito in enumerate(reversed(numero)))
+        calculado = 11 - (suma % 11)
+        esperado = "0" if calculado == 11 else "K" if calculado == 10 else str(calculado)
+        if dv != esperado:
+            raise ValueError("RUT inválido: el dígito verificador no corresponde.")
+        self.__rut = f"{int(numero)}-{dv}"
+
+    @property
+    def mora_vigente(self) -> bool:
+        """Indica si el cliente registra mora vigente."""
+        return self.__mora_vigente
+
+    @mora_vigente.setter
+    def mora_vigente(self, valor: bool):
+        if not isinstance(valor, bool):
+            raise TypeError("La mora vigente debe ser True o False.")
+        self.__mora_vigente = valor
 
     @property
     def nombre(self) -> str:

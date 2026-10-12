@@ -3,6 +3,7 @@ Módulo que define la clase base Cuenta para el sistema bancario.
 """
 
 from model.cliente import Cliente
+from model.cliente_con_mora_exception import ClienteConMoraException
 from model.saldo_insuficiente_exception import SaldoInsuficienteException
 from model.cuenta_bloqueada_exception import CuentaBloqueadaException
 
@@ -43,6 +44,8 @@ class Cuenta:
         """Valida que el titular sea una instancia de la clase Cliente."""
         if not isinstance(valor, Cliente):
             raise TypeError("El titular de la cuenta debe ser una instancia de Cliente.")
+        if valor.mora_vigente:
+            raise ClienteConMoraException("No se puede abrir una cuenta: el cliente tiene mora vigente.")
         self.__titular = valor
 
     @property

@@ -17,6 +17,7 @@ from model.detalle_transaccion import DetalleTransaccion
 from model.transaccion import Transaccion
 from model.saldo_insuficiente_exception import SaldoInsuficienteException
 from model.cuenta_bloqueada_exception import CuentaBloqueadaException
+from model.cliente_con_mora_exception import ClienteConMoraException
 
 __all__ = [
     "Cliente",
@@ -33,4 +34,5 @@ __all__ = [
     "Transaccion",
     "SaldoInsuficienteException",
     "CuentaBloqueadaException",
+    "ClienteConMoraException",
 ]
