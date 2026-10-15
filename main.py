@@ -1,12 +1,20 @@
 """
 =============================================================================
-PROGRAMA PRINCIPAL - EVALUACIÓN SUMATIVA N°2
+PROGRAMA PRINCIPAL - EVALUACIÓN SUMATIVA N°3
 Asignatura: Programación Orientada a Objeto Seguro
 Sistema Bancario - Demostración de Clases, Herencia, Polimorfismo y Excepciones
 =============================================================================
 """
 
 import sys
+import argparse
+import sqlite3
+from contextlib import closing
+from servicios.indicadores import API_UF, obtener_uf, precio_en_pesos, ErrorIndicador
+from servicios.persistencia import (
+    conectar, guardar_cliente, guardar_cuenta, listar_cuentas, guardar_transaccion,
+    obtener_cuenta, contar_detalles,
+)
 
 # Asegurar codificación UTF-8 en consolas Windows
 if hasattr(sys.stdout, "reconfigure"):
@@ -38,7 +46,20 @@ def separador(titulo: str):
     print("=" * 75)
 
 
-def main():
+def capturar_monto(entrada=input):
+    """Validación de entrada de usuario para consulta demostrativa."""
+    texto = entrada("Ingrese un monto positivo en pesos: ").strip()
+    try:
+        monto = float(texto)
+    except ValueError as exc:
+        raise ValueError("Debe ingresar un número válido.") from exc
+    import math
+    if not math.isfinite(monto) or monto <= 0:
+        raise ValueError("El monto debe ser positivo y finito.")
+    return monto
+
+
+def main(interactivo=False, base_datos="banco_demo.sqlite3", consultar_api=True):
     print(">>> INICIANDO SISTEMA BANCARIO POO SEGURO <<<\n")
 
     # -------------------------------------------------------------------------
@@ -242,17 +263,84 @@ def main():
     print(transaccion.generar_comprobante())
 
     # -------------------------------------------------------------------------
-    # 7. CIERRE EXITOSO
+    # 7. PERSISTENCIA REAL CON SQLITE Y RELECTURA DE DISCO
     # -------------------------------------------------------------------------
-    separador("7. Verificación Final")
+    separador("7. Persistencia SQLite: escritura y recuperación")
+    try:
+        with closing(conectar(base_datos)) as conexion:
+            anterior = obtener_cuenta(conexion, cuenta_corriente.numero_cuenta)
+            if anterior is None:
+                print("[INFO] No había registro previo: se inicializa la base de datos.")
+            else:
+                print(f"[OK] Registro de ejecución anterior leído desde SQLite: {anterior}")
+            with conexion:  # commit de todas las escrituras; rollback si algo falla
+                guardar_cliente(conexion, cliente1)
+                for cuenta in cuentas:
+                    guardar_cuenta(conexion, cuenta)
+                guardar_transaccion(
+                    conexion, transaccion.id_transaccion, transaccion.cuenta.numero_cuenta,
+                    transaccion.fecha, transaccion.tipo,
+                    [(detalle.concepto, detalle.monto) for detalle in transaccion.detalles],
+                )
+        # Cerramos y ABRIMOS OTRA CONEXIÓN para evidenciar persistencia en disco.
+        with closing(conectar(base_datos)) as conexion:
+            print("[OK] Cuentas recuperadas después de reabrir la base:", listar_cuentas(conexion))
+            print("[OK] Líneas de detalle recuperadas:", contar_detalles(conexion, "TRX-885412"))
+    except sqlite3.Error as error:
+        print(f"[ERROR] Fallo de la base de datos: {error}")
+        raise SystemExit(1) from error
+
+    # -------------------------------------------------------------------------
+    # 8. CONSUMO REAL DE API UF Y MANEJO DE ERRORES
+    # -------------------------------------------------------------------------
+    separador("8. API externa: costo de tasación calculado en UF")
+    if consultar_api:
+        try:
+            cotizacion = obtener_uf(timeout=5)
+            print(f"[OK] UF consultada desde {API_UF}: ${cotizacion:,.2f} CLP")
+            print(f"[OK] Ejemplo académico, tasación de 2 UF: ${precio_en_pesos(2, cotizacion):,.2f} CLP")
+        except ErrorIndicador as error:
+            print(f"[AVISO] No se pudo consultar la API: {error}")
+            print("[OK] La aplicación continúa sin inventar el valor de la UF.")
+    else:
+        print("[INFO] Se omitió la consulta online con --sin-api.")
+
+    # -------------------------------------------------------------------------
+    # 9. VALIDACIÓN OBSERVABLE DE ENTRADAS, INCLUSO SIN TECLEAR
+    # -------------------------------------------------------------------------
+    separador("9. Validación de entradas de usuario")
+    for texto in ("25000", "abc", "-100", "0", "NaN", "inf"):
+        try:
+            monto = capturar_monto(lambda _: texto)
+            print(f"[OK] Entrada {texto!r}: ${monto:,.2f}")
+        except ValueError as error:
+            print(f"[RECHAZADO] Entrada {texto!r}: {error}")
+    if interactivo:
+        print("\n[INTERACTIVO] Ahora ingresa tu propio monto:")
+        try:
+            print(f"[OK] Entrada aceptada: ${capturar_monto():,.2f}")
+        except (ValueError, EOFError) as error:
+            print(f"[CAPTURA] Entrada rechazada: {error}")
+
+    # -------------------------------------------------------------------------
+    # 10. CIERRE EXITOSO
+    # -------------------------------------------------------------------------
+    separador("10. Verificación Final")
     print("[OK] Todas las clases fueron instanciadas e integradas correctamente.")
     print("[OK] Herencia con super().__init__() aplicada.")
     print("[OK] Polimorfismo demostrado con 3 resultados diferentes para el mismo método.")
     print("[OK] SaldoInsuficienteException, ClienteConMoraException y CuentaBloqueadaException capturadas.")
     print("[OK] RUT inválido rechazado y agregación Cliente-Cuenta demostrada.")
     print("[OK] Transacción con líneas de detalle procesada exitosamente.")
+    print("[OK] Persistencia, validación de entradas y gestión de API implementadas.")
     print("\n>>> EJECUCIÓN DEL SISTEMA FINALIZADA CON ÉXITO <<<\n")
 
 
 if __name__ == "__main__":
-    main()
+    parser=argparse.ArgumentParser(description="Sistema bancario: demostración Sumativa 3")
+    parser.add_argument("--interactivo",action="store_true",help="Solicita y valida un monto por teclado")
+    parser.add_argument("--sin-api", action="store_true", help="Omite consulta UF al ejecutar sin Internet")
+    parser.add_argument("--api", action="store_true", help="Compatibilidad: consulta la UF (ya se hace por defecto)")
+    parser.add_argument("--bd",default="banco_demo.sqlite3",help="Ruta a base SQLite")
+    args=parser.parse_args()
+    main(interactivo=args.interactivo, base_datos=args.bd, consultar_api=not args.sin_api)
