@@ -7,6 +7,7 @@ Sistema Bancario - Demostración de Clases, Herencia, Polimorfismo y Excepciones
 """
 
 import sys
+import math
 import argparse
 import sqlite3
 from contextlib import closing
@@ -15,6 +16,7 @@ from servicios.persistencia import (
     conectar, guardar_cliente, guardar_cuenta, listar_cuentas, guardar_transaccion,
     obtener_cuenta, contar_detalles,
 )
+from dao import ClienteDAO, CuentaDAO, TransaccionDAO, conectar_db
 
 # Asegurar codificación UTF-8 en consolas Windows
 if hasattr(sys.stdout, "reconfigure"):
@@ -53,7 +55,6 @@ def capturar_monto(entrada=input):
         monto = float(texto)
     except ValueError as exc:
         raise ValueError("Debe ingresar un número válido.") from exc
-    import math
     if not math.isfinite(monto) or monto <= 0:
         raise ValueError("El monto debe ser positivo y finito.")
     return monto
@@ -263,29 +264,55 @@ def main(interactivo=False, base_datos="banco_demo.sqlite3", consultar_api=True)
     print(transaccion.generar_comprobante())
 
     # -------------------------------------------------------------------------
-    # 7. PERSISTENCIA REAL CON SQLITE Y RELECTURA DE DISCO
+    # 7. PERSISTENCIA REAL CON SQLITE Y CAPA DAO (CRUD COMPLETO)
     # -------------------------------------------------------------------------
-    separador("7. Persistencia SQLite: escritura y recuperación")
+    separador("7. Persistencia SQLite y Capa DAO: Operaciones CRUD")
     try:
-        with closing(conectar(base_datos)) as conexion:
+        with closing(conectar_db(base_datos)) as conexion:
+            cl_dao = ClienteDAO(conexion)
+            c_dao = CuentaDAO(conexion, cl_dao)
+            tr_dao = TransaccionDAO(conexion, c_dao)
+
             anterior = obtener_cuenta(conexion, cuenta_corriente.numero_cuenta)
             if anterior is None:
                 print("[INFO] No había registro previo: se inicializa la base de datos.")
             else:
                 print(f"[OK] Registro de ejecución anterior leído desde SQLite: {anterior}")
+
             with conexion:  # commit de todas las escrituras; rollback si algo falla
-                guardar_cliente(conexion, cliente1)
+                cl_dao.crear(cliente1)
                 for cuenta in cuentas:
-                    guardar_cuenta(conexion, cuenta)
-                guardar_transaccion(
-                    conexion, transaccion.id_transaccion, transaccion.cuenta.numero_cuenta,
-                    transaccion.fecha, transaccion.tipo,
-                    [(detalle.concepto, detalle.monto) for detalle in transaccion.detalles],
-                )
-        # Cerramos y ABRIMOS OTRA CONEXIÓN para evidenciar persistencia en disco.
-        with closing(conectar(base_datos)) as conexion:
+                    c_dao.crear(cuenta)
+                tr_dao.crear(transaccion)
+
+        # Cerramos y ABRIMOS OTRA CONEXIÓN para evidenciar persistencia en disco y CRUD.
+        with closing(conectar_db(base_datos)) as conexion:
+            c_dao = CuentaDAO(conexion)
+            tr_dao = TransaccionDAO(conexion, c_dao)
             print("[OK] Cuentas recuperadas después de reabrir la base:", listar_cuentas(conexion))
-            print("[OK] Líneas de detalle recuperadas:", contar_detalles(conexion, "TRX-885412"))
+            print("[OK] Líneas de detalle recuperadas:", tr_dao.contar_detalles("TRX-885412"))
+
+            # Demostración explícita de operaciones CRUD completas en DAO
+            print("\n  >> Comprobación de ciclo CRUD completo en CuentaDAO:")
+            cuenta_temp = CuentaVista("CV-TEMP-99", cliente1, 15000.0)
+            with conexion:
+                c_dao.crear(cuenta_temp)
+                print(f"     [CREATE] Cuenta {cuenta_temp.numero_cuenta} creada con saldo $15,000.")
+
+            rec_temp = c_dao.obtener_por_numero("CV-TEMP-99")
+            print(f"     [READ]   Cuenta {rec_temp.numero_cuenta} recuperada como {rec_temp.tipo_cuenta()} | Saldo: ${rec_temp.saldo:,.0f}.")
+
+            rec_temp.saldo = 25000.0
+            with conexion:
+                c_dao.actualizar(rec_temp)
+                print(f"     [UPDATE] Saldo actualizado en SQLite a ${rec_temp.saldo:,.0f}.")
+
+            with conexion:
+                c_dao.eliminar("CV-TEMP-99")
+                print(f"     [DELETE] Cuenta {rec_temp.numero_cuenta} eliminada de SQLite.")
+
+            verif = c_dao.obtener_por_numero("CV-TEMP-99")
+            print(f"     [OK] Verificación post-delete (retorna None): {verif}")
     except sqlite3.Error as error:
         print(f"[ERROR] Fallo de la base de datos: {error}")
         raise SystemExit(1) from error
@@ -332,7 +359,8 @@ def main(interactivo=False, base_datos="banco_demo.sqlite3", consultar_api=True)
     print("[OK] SaldoInsuficienteException, ClienteConMoraException y CuentaBloqueadaException capturadas.")
     print("[OK] RUT inválido rechazado y agregación Cliente-Cuenta demostrada.")
     print("[OK] Transacción con líneas de detalle procesada exitosamente.")
-    print("[OK] Persistencia, validación de entradas y gestión de API implementadas.")
+    print("[OK] Persistencia SQLite y capa DAO con operaciones CRUD completas implementadas.")
+    print("[OK] Consumo seguro de API UF mediante librería requests con timeout y manejo de fallas.")
     print("\n>>> EJECUCIÓN DEL SISTEMA FINALIZADA CON ÉXITO <<<\n")
 
 

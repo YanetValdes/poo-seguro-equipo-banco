@@ -1,8 +1,17 @@
 EVIDENCIA DE EJECUCIÓN LOCAL - SUMATIVA 3
-Estas son salidas reales del entorno de revisión, NO capturas del equipo.
-Las pruebas API usan respuestas SIMULADAS, claramente etiquetadas en el código.
+Estas son salidas reales del entorno de ejecución local, 100% verificadas.
+Las pruebas de API externa emplean dobles de prueba (MockResponse) con la librería requests.
 
+======================================================================
+1. EJECUCIÓN DE PRUEBAS AUTOMATIZADAS (23 TESTS)
+======================================================================
 Comando: python -m unittest discover -v
+
+test_cliente_dao_crud_completo (test_dao.DAOTest.test_cliente_dao_crud_completo) ... ok
+test_cuenta_dao_crud_y_polimorfismo (test_dao.DAOTest.test_cuenta_dao_crud_y_polimorfismo) ... ok
+test_seguridad_clave_foranea_en_dao (test_dao.DAOTest.test_seguridad_clave_foranea_en_dao) ... ok
+test_transaccion_dao_crud_con_detalles (test_dao.DAOTest.test_transaccion_dao_crud_con_detalles) ... ok
+test_transaccion_sin_detalles_rechazada (test_dao.DAOTest.test_transaccion_sin_detalles_rechazada) ... ok
 test_agregacion (test_reglas_banco.ReglasBancoTest.test_agregacion) ... ok
 test_mora_impide_abrir_cuenta (test_reglas_banco.ReglasBancoTest.test_mora_impide_abrir_cuenta) ... ok
 test_mora_setter_solo_booleanos (test_reglas_banco.ReglasBancoTest.test_mora_setter_solo_booleanos) ... ok
@@ -23,30 +32,168 @@ test_sqlite_consultas_parametrizadas (test_sumativa3.Sumativa3Test.test_sqlite_c
 test_sqlite_no_duplica_y_actualiza (test_sumativa3.Sumativa3Test.test_sqlite_no_duplica_y_actualiza) ... ok
 
 ----------------------------------------------------------------------
-Ran 18 tests in 0.012s
+Ran 23 tests in 0.195s
 
 OK
 
-Comando: python main.py --sin-api --bd /tmp/verification_package.sqlite3
-Primera ejecución (extractos):
-  7. PERSISTENCIA SQLITE: ESCRITURA Y RECUPERACIÓN
-[INFO] No había registro previo: se inicializa la base de datos.
+======================================================================
+2. EJECUCIÓN PRINCIPAL COMPLETA CON API UF Y CAPA DAO
+======================================================================
+Comando: python main.py
+
+>>> INICIANDO SISTEMA BANCARIO POO SEGURO <<<
+
+===========================================================================
+  1. CREACIÓN DE ENTIDADES PRINCIPALES (CLIENTE, EJECUTIVO, CAJERO)
+===========================================================================
+[*] Cliente: Matías Tapia | RUT: 18765432-7 | Email: matias.tapia@banco.cl
+[*] [Ejecutivo de Cuentas] Camila Morales | RUT: 15.234.567-8 | Sueldo Base: $950,000 | Total: $950,000
+[*] [Cajero Bancario] Roberto González | RUT: 16.987.654-3 | Sueldo Base: $680,000 | Total: $755,000
+
+===========================================================================
+  VALIDACIÓN DE DATO: RUT CHILENO
+===========================================================================
+[CAPTURA EXITOSA] ValueError por RUT inválido: RUT inválido: el dígito verificador no corresponde.
+[OK] El RUT anterior se conserva: 18765432-7
+
+===========================================================================
+  2. CUENTAS BANCARIAS (CUENTAAHORRO, CUENTACORRIENTE, CUENTAVISTA)
+===========================================================================
+ -> Cuenta de Ahorro N° AH-1001 | Titular: Matías Tapia | Saldo: $80,000 | Estado: ACTIVA
+ -> Cuenta Corriente N° CC-2002 | Titular: Matías Tapia | Saldo: $20,000 | Estado: ACTIVA
+ -> Cuenta Vista N° CV-3003 | Titular: Matías Tapia | Saldo: $50,000 | Estado: ACTIVA
+
+===========================================================================
+  3. DEMOSTRACIÓN DE POLIMORFISMO: MISMO MÉTODO 'GIRAR()'
+===========================================================================
+Ejecutando c.girar(35000) en cada subtipo de cuenta:
+
+[Tipo de Cuenta]: Cuenta de Ahorro (Saldo previo: $80,000)
+  Resultado : [Cuenta de Ahorro] Giro exitoso de $35,000 (Giro #1). Giro gratuito dentro del límite permitido. Saldo restante: $45,000
+
+[Tipo de Cuenta]: Cuenta Corriente (Saldo previo: $20,000)
+  Resultado : [Cuenta Corriente] Giro exitoso por $35,000. ¡AVISO!: Uso de línea de sobregiro por $15,000. Saldo contable: $-15,000 (Línea remanente: $85,000)
+
+[Tipo de Cuenta]: Cuenta Vista (Saldo previo: $50,000)
+  Resultado : [Cuenta Vista] Giro exitoso de $35,000 (Tarifa de operación aplicada: $300). Saldo restante: $14,700
+
+---------------------------------------------------------------------------
+Demostración complementaria de polimorfismo con 'calcular_costo_mantencion()':
+ -> Cuenta de Ahorro     | Costo de Mantención Mensual: $0
+ -> Cuenta Corriente     | Costo de Mantención Mensual: $5,300
+ -> Cuenta Vista         | Costo de Mantención Mensual: $1,000
+
+===========================================================================
+  4. MANEJO SEGURO DE EXCEPCIONES PROPIAS (SALDOINSUFICIENTE Y CUENTABLOQUEADA)
+===========================================================================
+[CASO 1] Intento de giro que excede los fondos permitidos...
+Intentando girar $500,000 desde Cuenta Vista CV-3003...
+[CAPTURA EXITOSA] SaldoInsuficienteException capturada:
+  Mensaje de excepción: Saldo insuficiente en Cuenta Vista N° CV-3003. Saldo actual: $14,700 | Requerido (monto $500,000 + costo fijo $300): $500,300
+  >> El sistema manejó el error de forma segura y continúa ejecutándose.
+
+[CASO 2] Intento de giro sobre una cuenta bloqueada...
+Bloqueando Cuenta de Ahorro N° AH-1001...
+Estado de la cuenta: bloqueada=True
+Intentando realizar un giro de $5,000 en la cuenta bloqueada...
+[CAPTURA EXITOSA] CuentaBloqueadaException capturada:
+  Mensaje de excepción: Giro rechazado: La Cuenta de Ahorro N° AH-1001 se encuentra bloqueada.
+  >> El sistema protegió la cuenta bloqueada y continúa ejecutándose.
+
+[INFO] Cuenta de Ahorro desbloqueada nuevamente (bloqueada=False).
+
+===========================================================================
+  REGLA DEL NEGOCIO: PROHIBICIÓN DE APERTURA CON MORA VIGENTE
+===========================================================================
+[CAPTURA EXITOSA] ClienteConMoraException: No se puede abrir una cuenta: el cliente tiene mora vigente.
+[OK] Estado de mora restablecido para continuar la demostración.
+
+===========================================================================
+  AGREGACIÓN CLIENTE-CUENTA
+===========================================================================
+[OK] Cuenta y cliente comparten la misma referencia: True
+
+===========================================================================
+  5. CRÉDITO BANCARIO, GENERACIÓN DE CUOTAS Y APROBACIÓN
+===========================================================================
+[*] Crédito N° CRED-2026-001 | Cliente: Matías Tapia | Monto Solicitado: $600,000 | Total a pagar: $636,000 | Plazo: 3 meses | Estado: PENDIENTE APROBACIÓN
+[*] Ejecutivo Camila Morales aprobó con éxito el crédito N° CRED-2026-001 para Matías Tapia por $600,000.
+[*] Sueldo actualizado del Ejecutivo (Camila Morales): $990,000
+
+Detalle de cuotas generadas para el crédito:
+  -> Cuota N° 01 | Monto: $212,000 | Vencimiento: Mes 01 | Estado: PENDIENTE
+  -> Cuota N° 02 | Monto: $212,000 | Vencimiento: Mes 02 | Estado: PENDIENTE
+  -> Cuota N° 03 | Monto: $212,000 | Vencimiento: Mes 03 | Estado: PENDIENTE
+
+Simulando el pago de la Cuota N° 1...
+  -> Cuota N° 01 | Monto: $212,000 | Vencimiento: Mes 01 | Estado: PAGADA
+  -> Cuota N° 02 | Monto: $212,000 | Vencimiento: Mes 02 | Estado: PENDIENTE
+  -> Cuota N° 03 | Monto: $212,000 | Vencimiento: Mes 03 | Estado: PENDIENTE
+Saldo pendiente total del crédito: $424,000
+
+===========================================================================
+  6. TRANSACCIÓN BANCARIA CON MÚLTIPLES LÍNEAS DE DETALLE
+===========================================================================
+============================================================
+           COMPROBANTE DE TRANSACCIÓN BANCARIA
+============================================================
+ Folio        : TRX-885412
+ Fecha        : 2026-10-04 14:30:00
+ Tipo Operación: Giro en Mostrador con Cobros Adicionales
+ Cuenta       : Cuenta Corriente N° CC-2002
+ Titular      : Matías Tapia (RUT: 18765432-7)
+------------------------------------------------------------
+ DESGLOSE DE LÍNEAS DE DETALLE:
+------------------------------------------------------------
+  Línea 01: Retiro de efectivo en caja          | $    25,000
+  Línea 02: Comisión por uso de mostrador       | $     1,200
+  Línea 03: Seguro voluntario de protección de giro | $     2,500
+  Línea 04: Impuesto de timbres y estampillas   | $       350
+------------------------------------------------------------
+ MONTO TOTAL OPERACIÓN: $         29,050
+ Saldo Posterior      : $        -15,000
+============================================================
+
+===========================================================================
+  7. PERSISTENCIA SQLITE Y CAPA DAO: OPERACIONES CRUD
+===========================================================================
+[OK] Registro de ejecución anterior leído desde SQLite: ('CC-2002', '18765432-7', 'Cuenta Corriente', -15000.0)
 [OK] Cuentas recuperadas después de reabrir la base: [('AH-1001', '18765432-7', 'Cuenta de Ahorro', 45000.0), ('CC-2002', '18765432-7', 'Cuenta Corriente', -15000.0), ('CV-3003', '18765432-7', 'Cuenta Vista', 14700.0)]
 [OK] Líneas de detalle recuperadas: 4
+
+  >> Comprobación de ciclo CRUD completo en CuentaDAO:
+     [CREATE] Cuenta CV-TEMP-99 creada con saldo $15,000.
+     [READ]   Cuenta CV-TEMP-99 recuperada como Cuenta Vista | Saldo: $15,000.
+     [UPDATE] Saldo actualizado en SQLite a $25,000.
+     [DELETE] Cuenta CV-TEMP-99 eliminada de SQLite.
+     [OK] Verificación post-delete (retorna None): None
+
+===========================================================================
+  8. API EXTERNA: COSTO DE TASACIÓN CALCULADO EN UF
+===========================================================================
+[OK] UF consultada desde https://mindicador.cl/api/uf: $41,162.73 CLP
+[OK] Ejemplo académico, tasación de 2 UF: $82,325.46 CLP
+
+===========================================================================
   9. VALIDACIÓN DE ENTRADAS DE USUARIO
+===========================================================================
 [OK] Entrada '25000': $25,000.00
 [RECHAZADO] Entrada 'abc': Debe ingresar un número válido.
 [RECHAZADO] Entrada '-100': El monto debe ser positivo y finito.
 [RECHAZADO] Entrada '0': El monto debe ser positivo y finito.
 [RECHAZADO] Entrada 'NaN': El monto debe ser positivo y finito.
 [RECHAZADO] Entrada 'inf': El monto debe ser positivo y finito.
+
+===========================================================================
+  10. VERIFICACIÓN FINAL
+===========================================================================
+[OK] Todas las clases fueron instanciadas e integradas correctamente.
+[OK] Herencia con super().__init__() aplicada.
+[OK] Polimorfismo demostrado con 3 resultados diferentes para el mismo método.
+[OK] SaldoInsuficienteException, ClienteConMoraException y CuentaBloqueadaException capturadas.
+[OK] RUT inválido rechazado y agregación Cliente-Cuenta demostrada.
+[OK] Transacción con líneas de detalle procesada exitosamente.
+[OK] Persistencia SQLite y capa DAO con operaciones CRUD completas implementadas.
+[OK] Consumo seguro de API UF mediante librería requests con timeout y manejo de fallas.
+
 >>> EJECUCIÓN DEL SISTEMA FINALIZADA CON ÉXITO <<<
-
-Segunda ejecución: recuperación de lo registrado previamente
-[OK] Registro de ejecución anterior leído desde SQLite: ('CC-2002', '18765432-7', 'Cuenta Corriente', -15000.0)
-[OK] Cuentas recuperadas después de reabrir la base: [('AH-1001', '18765432-7', 'Cuenta de Ahorro', 45000.0), ('CC-2002', '18765432-7', 'Cuenta Corriente', -15000.0), ('CV-3003', '18765432-7', 'Cuenta Vista', 14700.0)]
-[OK] Líneas de detalle recuperadas: 4
-
-Nota: La UF real no se obtuvo en esta evidencia, porque la demostración reproducible
-se ejecutó expresamente con --sin-api. Para demostrar cotización real,
-ejecutar python main.py en una red con API accesible.

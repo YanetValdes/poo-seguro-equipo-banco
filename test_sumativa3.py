@@ -1,5 +1,4 @@
 """Pruebas automatizadas de Sumativa 3, sin depender de Internet."""
-import io
 import json
 import math
 import sqlite3
@@ -7,10 +6,10 @@ import tempfile
 import unittest
 from contextlib import closing
 from pathlib import Path
-from urllib.error import HTTPError, URLError
+import requests
 
 from main import capturar_monto
-from servicios.indicadores import obtener_uf, precio_en_pesos, ErrorIndicador
+from servicios.indicadores import obtener_uf, precio_en_pesos, ErrorIndicador, API_UF
 from servicios.persistencia import (conectar, guardar_cliente, guardar_cuenta,
                                     listar_cuentas, obtener_cuenta, contar_detalles,
                                     guardar_transaccion)
@@ -18,50 +17,63 @@ from model.cliente import Cliente
 from model.cuenta_vista import CuentaVista
 
 
-class Respuesta(io.BytesIO):
-    """Doble de prueba para una respuesta HTTP; NO es una cotización real."""
+class MockResponse:
+    """Doble de prueba para simular respuestas de requests sin acceder a Internet."""
 
-    def __enter__(self):
-        return self
+    def __init__(self, json_data=None, text="", status_code=200):
+        self._json_data = json_data
+        self.text = text
+        self.status_code = status_code
 
-    def __exit__(self, *_):
-        self.close()
+    def raise_for_status(self):
+        if self.status_code >= 400:
+            raise requests.exceptions.HTTPError(
+                f"HTTP Error {self.status_code}",
+                response=self
+            )
+
+    def json(self):
+        if self._json_data is not None:
+            return self._json_data
+        return json.loads(self.text)
 
 
 def fake_api(datos):
-    return lambda request, timeout: Respuesta(json.dumps(datos).encode("utf-8"))
+    return lambda url, timeout, headers: MockResponse(json_data=datos)
 
 
 class Sumativa3Test(unittest.TestCase):
     def test_api_uf_respuesta_valida_simulada(self):
-        def abrir(request, timeout):
+        def mock_req(url, timeout, headers):
             self.assertEqual(timeout, 5)
-            self.assertEqual(request.full_url, "https://mindicador.cl/api/uf")
-            return Respuesta(b'{"serie": [{"valor": 39000}]}')
-        self.assertEqual(obtener_uf(opener=abrir), 39000)
+            self.assertEqual(url, API_UF)
+            return MockResponse(json_data={"serie": [{"valor": 39000}]})
+        self.assertEqual(obtener_uf(requester=mock_req), 39000)
         self.assertEqual(precio_en_pesos(2, 39000), 78000)
 
     def test_api_uf_caida_red(self):
-        def abrir(request, timeout):
-            raise URLError("sin Internet")
+        def mock_req(url, timeout, headers):
+            raise requests.exceptions.ConnectionError("sin Internet")
         with self.assertRaises(ErrorIndicador):
-            obtener_uf(opener=abrir)
+            obtener_uf(requester=mock_req)
 
     def test_api_uf_timeout(self):
-        def abrir(request, timeout):
-            raise TimeoutError("tiempo excedido")
+        def mock_req(url, timeout, headers):
+            raise requests.exceptions.Timeout("tiempo excedido")
         with self.assertRaisesRegex(ErrorIndicador, "tiempo"):
-            obtener_uf(opener=abrir)
+            obtener_uf(requester=mock_req)
 
     def test_api_uf_http_error(self):
-        def abrir(request, timeout):
-            raise HTTPError(request.full_url, 503, "Servicio no disponible", None, None)
+        def mock_req(url, timeout, headers):
+            return MockResponse(status_code=503)
         with self.assertRaises(ErrorIndicador):
-            obtener_uf(opener=abrir)
+            obtener_uf(requester=mock_req)
 
     def test_api_uf_json_malformado(self):
+        def mock_req(url, timeout, headers):
+            return MockResponse(text="{mal json")
         with self.assertRaises(ErrorIndicador):
-            obtener_uf(opener=lambda req, timeout: Respuesta(b'{mal json'))
+            obtener_uf(requester=mock_req)
 
     def test_api_uf_formato_inesperado(self):
         for datos in ([], {}, {"serie": []}, {"serie": [None]},
@@ -69,12 +81,12 @@ class Sumativa3Test(unittest.TestCase):
                       {"serie": [{"valor": -8}]},
                       {"serie": [{"valor": True}]}):
             with self.subTest(datos=datos), self.assertRaises(ErrorIndicador):
-                obtener_uf(opener=fake_api(datos))
+                obtener_uf(requester=fake_api(datos))
 
     def test_api_uf_infinito_y_nan(self):
         for valor in (math.inf, -math.inf, math.nan):
             with self.subTest(valor=valor), self.assertRaises(ErrorIndicador):
-                obtener_uf(opener=fake_api({"serie": [{"valor": valor}]}))
+                obtener_uf(requester=fake_api({"serie": [{"valor": valor}]}))
 
     def test_api_costo_en_uf_valida_argumentos(self):
         for valor in (0, -3, math.nan, math.inf, "2", True):

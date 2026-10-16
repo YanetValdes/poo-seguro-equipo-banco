@@ -12,7 +12,7 @@ Este archivo explica cómo revisar una versión posterior corregida y solicitar 
 2. Entrar en la carpeta `poo-seguro-equipo-banco-main` (debe verse `main.py`).
 3. Abrir esa carpeta en Visual Studio Code, Antigravity o el editor de Python que usen.
 4. Abrir una terminal dentro de esa misma carpeta.
-5. En Windows pueden usar `py` en lugar de `python`.
+5. En Windows pueden usar `py` en lugar de `python`, o desactivar los alias de la tienda de Windows en Configuración de aplicaciones si `python` no responde.
 
 ## 2. Ejecutar el programa
 
@@ -31,13 +31,13 @@ Si no tienen Internet, pueden ejecutar de manera intencional:
 python main.py --sin-api
 ```
 
-## 3. Ejecutar 18 pruebas automatizadas
+## 3. Ejecutar 23 pruebas automatizadas
 
 ```bash
 python -m unittest discover -v
 ```
 
-Se debe ver `Ran 18 tests` y `OK`. Las pruebas de UF emplean respuestas simuladas **marcadas como pruebas**, no como cotización real de mercado.
+Se debe ver `Ran 23 tests` y `OK`. Las pruebas cubren DAO y CRUD completo (`test_dao.py`), reglas de negocio POO (`test_reglas_banco.py`) y peticiones con `requests` y persistencia (`test_sumativa3.py`).
 
 ## 4. Demostrar que la información permanece guardada
 
@@ -48,7 +48,7 @@ python main.py --sin-api
 python main.py --sin-api
 ```
 
-En la primera ejecución debe aparecer el mensaje de cuentas recuperadas al reabrir SQLite. En la segunda, además, debe aparecer que se recuperó un registro de la ejecución anterior. El archivo `banco_demo.sqlite3` se genera automáticamente y **no** debe subirse a GitHub.
+En la primera ejecución debe aparecer el mensaje de cuentas recuperadas al reabrir SQLite y el ciclo CRUD del DAO. En la segunda, además, debe aparecer que se recuperó un registro de la ejecución anterior. El archivo `banco_demo.sqlite3` se genera automáticamente y **no** debe subirse a GitHub.
 
 ## 5. Ingresar un dato por teclado
 
@@ -69,29 +69,29 @@ git clone https://github.com/YanetValdes/poo-seguro-equipo-banco.git
 cd poo-seguro-equipo-banco
 ```
 
-Copiar **el contenido interno** de la carpeta corregida dentro de la carpeta clonada, reemplazando los archivos existentes y agregando los nuevos. Debe quedar `main.py` en la raíz, con `model/` y `servicios/` al lado. No crear una carpeta `poo-seguro-equipo-banco-main` dentro del repositorio.
+Copiar **el contenido interno** de la carpeta corregida dentro de la carpeta clonada, reemplazando los archivos existentes y agregando los nuevos. Debe quedar `main.py` en la raíz, con `model/`, `dao/` y `servicios/` al lado. No crear una carpeta `poo-seguro-equipo-banco-main` dentro del repositorio.
 
 Luego ejecutar:
 
 ```bash
 git status
-git add README.md main.py model servicios test_reglas_banco.py test_sumativa3.py GUIA_DE_CORRECCION_Y_ENTREGA.md .gitignore
-git commit -m "Implementar Sumativa 3: SQLite, UF API, validaciones y pruebas"
+git add README.md main.py model dao servicios requirements.txt test_reglas_banco.py test_sumativa3.py test_dao.py GUIA_DE_CORRECCION_Y_ENTREGA.md EVIDENCIA_TECNICA_PRUEBAS.txt .gitignore
+git commit -m "Implementar Sumativa 3: Capa DAO CRUD, requests API UF, validaciones seguras y 23 pruebas"
 git push origin main
 ```
 
 Si `git push` falla por permisos o autenticación, la propietaria del repositorio debe ingresar a su cuenta de GitHub y configurar el acceso. Si aparecen cambios remotos inesperados, detenerse y revisar antes de sobrescribir.
 
-Después de subir, abrir el repositorio en GitHub y comprobar que aparecen en la raíz las carpetas `model/`, `servicios/`, más `main.py`, `README.md` y `test_sumativa3.py`. Verificar también la fecha y el identificador del nuevo commit.
+Después de subir, abrir el repositorio en GitHub y comprobar que aparecen en la raíz las carpetas `model/`, `dao/`, `servicios/`, más `main.py`, `README.md`, `requirements.txt` y los archivos de prueba. Verificar también la fecha y el identificador del nuevo commit.
 
 ## 7. Evidencias que conviene guardar
 
-- Captura de terminal de `python -m unittest discover -v` mostrando 18 tests y `OK`.
+- Captura de terminal de `python -m unittest discover -v` mostrando 23 tests y `OK`.
 - Captura de `python main.py` mostrando validación de RUT, reglas bancarias y polimorfismo.
-- Capturas de sección 7: primera y segunda ejecución con SQLite persistido.
-- Captura de sección 8 con **cotización UF real y precio en pesos**, cuando la API funcione; en caso de falla, captura del manejo del error y pruebas de API con respuestas simuladas.
+- Capturas de sección 7: primera y segunda ejecución con SQLite persistido y demostración CRUD del DAO.
+- Captura de sección 8 con **cotización UF real y precio en pesos** vía `requests`.
 - Captura de sección 9 con entrada aceptada y rechazada.
-- Pantallazo del nuevo commit y los archivos de `servicios/` en GitHub.
+- Pantallazo del nuevo commit con las carpetas `dao/`, `model/`, `servicios/` en GitHub.
 
 Las capturas deben venir de la ejecución real del programa; no inventar salidas ni afirmar una consulta UF real si solo se probaron respuestas simuladas.
 

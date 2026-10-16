@@ -1,8 +1,9 @@
-"""Consulta segura de la UF chilena para una simulación bancaria académica."""
-import json
+"""
+Consulta segura de la UF chilena para el sistema bancario mediante la librería requests.
+Aplica validación estricta de cotizaciones, tiempo de espera (timeout) y manejo de excepciones.
+"""
 import math
-from urllib.error import HTTPError, URLError
-from urllib.request import Request, urlopen
+import requests
 
 API_UF = "https://mindicador.cl/api/uf"
 
@@ -11,27 +12,49 @@ class ErrorIndicador(Exception):
     """No fue posible consultar una cotización de UF válida."""
 
 
-def obtener_uf(timeout=5, opener=urlopen):
-    """Obtiene UF en CLP usando una API real; nunca fabrica una cotización.
-
-    `opener` permite simular respuestas en pruebas sin acceder a Internet.
+def obtener_uf(timeout=5, requester=None, session=None, opener=None):
     """
-    if not isinstance(timeout, (int, float)) or not math.isfinite(timeout) or timeout <= 0:
+    Obtiene la cotización de la UF en CLP utilizando la librería requests y la API pública.
+    Nunca fabrica una cotización falsa ni genera datos simulados como reales.
+
+    Parámetros opcionales permiten inyectar simulaciones para pruebas sin conexión:
+      - `requester`: función callable(url, timeout, headers) -> response
+      - `session`: instancia de requests.Session
+      - `opener`: adaptador de compatibilidad para pruebas legadas
+    """
+    if isinstance(timeout, bool) or not isinstance(timeout, (int, float)) or not math.isfinite(timeout) or timeout <= 0:
         raise ValueError("El timeout debe ser positivo y finito.")
-    solicitud = Request(
-        API_UF,
-        headers={"Accept": "application/json", "User-Agent": "SistemaBancoAcademico/1.0"},
-    )
+
+    headers = {
+        "Accept": "application/json",
+        "User-Agent": "SistemaBancoAcademico/1.0",
+    }
+
     try:
-        with opener(solicitud, timeout=timeout) as respuesta:
-            datos = json.load(respuesta)
-    except (HTTPError, URLError, TimeoutError, OSError) as exc:
-        if hasattr(exc, "close"):
-            try:
-                exc.close()
-            except Exception:
-                pass
-        raise ErrorIndicador("Falla de conexión, HTTP o tiempo de espera de la API.") from exc
+        if requester is not None:
+            resp = requester(API_UF, timeout=timeout, headers=headers)
+        elif session is not None:
+            resp = session.get(API_UF, timeout=timeout, headers=headers)
+        elif opener is not None:
+            # Adaptador de compatibilidad para pruebas que usan opener
+            class DummyReq:
+                full_url = API_UF
+            raw = opener(DummyReq(), timeout=timeout)
+            import json
+            datos = json.load(raw)
+            resp = None
+        else:
+            resp = requests.get(API_UF, timeout=timeout, headers=headers)
+
+        if resp is not None:
+            if hasattr(resp, "raise_for_status"):
+                resp.raise_for_status()
+            datos = resp.json()
+
+    except (requests.exceptions.Timeout, TimeoutError) as exc:
+        raise ErrorIndicador("Falla por tiempo de espera de la API (timeout).") from exc
+    except (requests.exceptions.ConnectionError, requests.exceptions.HTTPError, requests.exceptions.RequestException, OSError) as exc:
+        raise ErrorIndicador("Falla de conexión o error HTTP de la API.") from exc
     except (ValueError, UnicodeError, TypeError) as exc:
         raise ErrorIndicador("La API respondió con JSON inválido.") from exc
 
