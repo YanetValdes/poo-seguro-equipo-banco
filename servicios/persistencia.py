@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS clientes (
     rut TEXT PRIMARY KEY,
     nombre TEXT NOT NULL,
     apellido TEXT NOT NULL,
+    telefono TEXT NOT NULL,
     email TEXT NOT NULL,
     mora_vigente INTEGER NOT NULL CHECK(mora_vigente IN (0,1))
 );
@@ -45,6 +46,9 @@ def conectar(ruta):
     try:
         con.execute("PRAGMA foreign_keys = ON")
         con.executescript(ESQUEMA)
+        columnas = [fila[1] for fila in con.execute("PRAGMA table_info(clientes)").fetchall()]
+        if "telefono" not in columnas and "rut" in columnas:
+            con.execute("ALTER TABLE clientes ADD COLUMN telefono TEXT NOT NULL DEFAULT ''")
     except Exception:
         con.close()
         raise
@@ -53,13 +57,14 @@ def conectar(ruta):
 
 def guardar_cliente(con, cliente):
     con.execute(
-        """INSERT INTO clientes (rut,nombre,apellido,email,mora_vigente)
-           VALUES (?,?,?,?,?)
+        """INSERT INTO clientes (rut,nombre,apellido,telefono,email,mora_vigente)
+           VALUES (?,?,?,?,?,?)
            ON CONFLICT(rut) DO UPDATE SET
                nombre=excluded.nombre, apellido=excluded.apellido,
-               email=excluded.email, mora_vigente=excluded.mora_vigente""",
-        (cliente.rut, cliente.nombre, cliente.apellido, cliente.email,
-         int(cliente.mora_vigente)),
+               telefono=excluded.telefono, email=excluded.email,
+               mora_vigente=excluded.mora_vigente""",
+        (cliente.rut, cliente.nombre, cliente.apellido, cliente.telefono,
+         cliente.email, int(cliente.mora_vigente)),
     )
 
 

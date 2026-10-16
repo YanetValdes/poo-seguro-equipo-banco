@@ -26,6 +26,11 @@ def obtener_uf(timeout=5, opener=urlopen):
         with opener(solicitud, timeout=timeout) as respuesta:
             datos = json.load(respuesta)
     except (HTTPError, URLError, TimeoutError, OSError) as exc:
+        if hasattr(exc, "close"):
+            try:
+                exc.close()
+            except Exception:
+                pass
         raise ErrorIndicador("Falla de conexión, HTTP o tiempo de espera de la API.") from exc
     except (ValueError, UnicodeError, TypeError) as exc:
         raise ErrorIndicador("La API respondió con JSON inválido.") from exc

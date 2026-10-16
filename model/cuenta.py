@@ -2,6 +2,7 @@
 Módulo que define la clase base Cuenta para el sistema bancario.
 """
 
+import math
 from model.cliente import Cliente
 from model.cliente_con_mora_exception import ClienteConMoraException
 from model.saldo_insuficiente_exception import SaldoInsuficienteException
@@ -56,8 +57,10 @@ class Cuenta:
     @saldo.setter
     def saldo(self, valor: float):
         """Valida que el saldo a asignar sea un número real."""
-        if not isinstance(valor, (int, float)):
+        if isinstance(valor, bool) or not isinstance(valor, (int, float)):
             raise TypeError("El saldo debe ser un valor numérico.")
+        if not math.isfinite(valor):
+            raise ValueError("El saldo debe ser un número finito.")
         self.__saldo = float(valor)
 
     @property
@@ -89,8 +92,8 @@ class Cuenta:
             raise CuentaBloqueadaException(
                 f"No es posible depositar: la cuenta {self.numero_cuenta} se encuentra bloqueada."
             )
-        if not isinstance(monto, (int, float)) or monto <= 0:
-            raise ValueError("El monto a depositar debe ser un número mayor a 0.")
+        if isinstance(monto, bool) or not isinstance(monto, (int, float)) or not math.isfinite(monto) or monto <= 0:
+            raise ValueError("El monto a depositar debe ser un número positivo y finito mayor a 0.")
 
         self.saldo += monto
         return self.saldo
@@ -105,8 +108,8 @@ class Cuenta:
             raise CuentaBloqueadaException(
                 f"No es posible girar: la cuenta {self.numero_cuenta} se encuentra bloqueada."
             )
-        if not isinstance(monto, (int, float)) or monto <= 0:
-            raise ValueError("El monto a girar debe ser un número mayor a 0.")
+        if isinstance(monto, bool) or not isinstance(monto, (int, float)) or not math.isfinite(monto) or monto <= 0:
+            raise ValueError("El monto a girar debe ser un número positivo y finito mayor a 0.")
 
         if monto > self.saldo:
             raise SaldoInsuficienteException(

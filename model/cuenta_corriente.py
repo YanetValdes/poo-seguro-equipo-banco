@@ -2,6 +2,7 @@
 Módulo que define la clase CuentaCorriente.
 """
 
+import math
 from model.cuenta import Cuenta
 from model.cliente import Cliente
 from model.saldo_insuficiente_exception import SaldoInsuficienteException
@@ -67,8 +68,8 @@ class CuentaCorriente(Cuenta):
             raise CuentaBloqueadaException(
                 f"Giro rechazado: La Cuenta Corriente N° {self.numero_cuenta} se encuentra bloqueada."
             )
-        if not isinstance(monto, (int, float)) or monto <= 0:
-            raise ValueError("El monto a girar debe ser mayor a 0.")
+        if isinstance(monto, bool) or not isinstance(monto, (int, float)) or not math.isfinite(monto) or monto <= 0:
+            raise ValueError("El monto a girar debe ser un número positivo y finito mayor a 0.")
 
         total_disponible = self.saldo_total_disponible
         if monto > total_disponible:

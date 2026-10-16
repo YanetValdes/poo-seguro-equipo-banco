@@ -3,6 +3,9 @@ Módulo que define la clase DetalleTransaccion (Línea de detalle).
 """
 
 
+import math
+
+
 class DetalleTransaccion:
     """
     Representa una línea de detalle individual perteneciente a una transacción bancaria.
@@ -45,9 +48,11 @@ class DetalleTransaccion:
 
     @monto.setter
     def monto(self, valor: float):
-        """Valida que el monto sea un valor numérico."""
-        if not isinstance(valor, (int, float)):
+        """Valida que el monto sea un valor numérico finito mayor o igual a 0."""
+        if isinstance(valor, bool) or not isinstance(valor, (int, float)):
             raise TypeError("El monto del detalle debe ser un valor numérico.")
+        if not math.isfinite(valor) or valor < 0:
+            raise ValueError("El monto del detalle debe ser un número finito mayor o igual a 0.")
         self.__monto = float(valor)
 
     def __str__(self) -> str:

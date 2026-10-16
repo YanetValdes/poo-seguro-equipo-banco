@@ -2,6 +2,7 @@
 Módulo que define la clase CuentaAhorro.
 """
 
+import math
 from model.cuenta import Cuenta
 from model.cliente import Cliente
 from model.saldo_insuficiente_exception import SaldoInsuficienteException
@@ -82,8 +83,8 @@ class CuentaAhorro(Cuenta):
             raise CuentaBloqueadaException(
                 f"Giro rechazado: La Cuenta de Ahorro N° {self.numero_cuenta} se encuentra bloqueada."
             )
-        if not isinstance(monto, (int, float)) or monto <= 0:
-            raise ValueError("El monto a girar debe ser mayor a 0.")
+        if isinstance(monto, bool) or not isinstance(monto, (int, float)) or not math.isfinite(monto) or monto <= 0:
+            raise ValueError("El monto a girar debe ser un número positivo y finito mayor a 0.")
 
         comision = 0.0
         detalle_comision = "Giro gratuito dentro del límite permitido."

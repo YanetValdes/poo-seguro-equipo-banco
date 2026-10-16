@@ -124,6 +124,8 @@ class Credito:
 
     def pagar_cuota(self, numero_cuota: int):
         """Marca una cuota como pagada por su número."""
+        if not self.__aprobado:
+            raise ValueError("No se pueden pagar cuotas de un crédito que no ha sido aprobado.")
         for c in self.__cuotas:
             if c.numero_cuota == numero_cuota:
                 c.pagar()

@@ -2,6 +2,7 @@
 Módulo que define la clase CuentaVista.
 """
 
+import math
 from model.cuenta import Cuenta
 from model.cliente import Cliente
 from model.saldo_insuficiente_exception import SaldoInsuficienteException
@@ -62,8 +63,8 @@ class CuentaVista(Cuenta):
             raise CuentaBloqueadaException(
                 f"Giro rechazado: La Cuenta Vista N° {self.numero_cuenta} se encuentra bloqueada."
             )
-        if not isinstance(monto, (int, float)) or monto <= 0:
-            raise ValueError("El monto a girar debe ser mayor a 0.")
+        if isinstance(monto, bool) or not isinstance(monto, (int, float)) or not math.isfinite(monto) or monto <= 0:
+            raise ValueError("El monto a girar debe ser un número positivo y finito mayor a 0.")
 
         total_requerido = monto + self.__costo_fijo_giro
         if total_requerido > self.saldo:
